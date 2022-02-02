@@ -1,0 +1,75 @@
+import numpy as np 
+import cv2
+import time
+
+font = cv2.FONT_HERSHEY_COMPLEX
+#defining files for detection
+face_cascade = cv2.CascadeClassifier("front_face.xml")
+eye_cascade = cv2.CascadeClassifier("eye.xml")
+cv2.namedWindow("Cam", cv2.WINDOW_AUTOSIZE) #window size is 1280x720 for mac camera
+cap = cv2.VideoCapture(0)
+keypress = None
+face = []
+eyes = []
+count = 0
+message = ""
+
+#function to output list of detected object sizes and locations
+def classification(file, gray):
+    list = file.detectMultiScale(
+        gray,
+        scaleFactor = 1.1,
+        minNeighbors = 5,
+        minSize = (30,30)
+    )
+    return list
+
+#while escape has not been clicked
+while(keypress != 27):
+    start_time = time.time()
+    message = ""
+    ret, img = cap.read()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    #serialization of the process so the FPS drop every 4 frames to detect whatever I need it to
+    #faster than running every frame and looks a lot smoother while still retaining the accuracy I need
+    if(count % 4 == 0):
+        face = classification(face_cascade, gray)
+        #eyes = classification(eye_cascade, gray)
+
+    #iterates through the list to draw whatever I need using the coordinates
+    for(x,y,w,h) in face:
+        cv2.rectangle(img, (x,y), (x + w, y + h), (0,255,0), 2)
+        cv2.circle(img, (x + int(w/2), y + int(h/2)), 10, (0,0,255), 2)
+        cv2.line(img, (x,y), (x + w, y + h), (0,0,255), 2)
+        cv2.line(img, (x + w, y), (x, y+h), (0,0,255), 2)
+
+        #tells the user where they need to move in order to center themselves
+        #could also be used to move the camera using motors with a raspberry pi or jetson nano
+        if(x + w/2 > 670):
+            message += "Right "
+        elif(x + w/2 < 610):
+            message += "Left "
+        elif(y + h/2 > 390):
+            message += "Up "
+        elif(y + h/2 < 330):
+            message += "Down "
+        else:
+            message += "Centered"
+        cv2.putText(img, message, (x,y), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    
+    for(x,y,w,h) in eyes:
+        cv2.rectangle(img, (x,y), (x + w, y + h), (255,0,0), 2)
+
+    cv2.putText(img, "# of faces: " + str(len(face)), (10,700), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    cv2.putText(img, "FPS: " + str(round((1.0/(time.time() - start_time)), 4)), (0,40), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    cv2.line(img, (640,0), (640,720), (0,0,255), 2)
+    cv2.line(img, (0,360), (1280,360), (0,0,255), 2)
+    cv2.rectangle(img, (610, 330), (670, 390), (0,0,255), 2)
+
+    cv2.imshow("Cam", img)
+    #print(cv2.getWindowImageRect("Cam"))
+    keypress = cv2.waitKey(30) & 0xFF
+    count += 1
+
+cap.release()
